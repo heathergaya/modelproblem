@@ -1,0 +1,72 @@
+model { 
+
+beta0 ~ dunif(-3,3)
+beta1 ~ dunif(-3,3)
+gamma ~ dunif(0,1) #recruitment
+#k[1] ~ dunif(0,.1) #movement sd when not alive
+#k[2] ~ dunif(0,.1) #movement sd when alive
+k[1] <- 1/100
+k[2] <- 1/25
+for(q in 1:npix){
+phi[q] ~ dunif(0,1) #survival
+}
+p.s ~ dunif(0,1) #sex ratio
+
+
+for(q in 1:npix){
+  lambda[q,1] <- exp(beta0 + beta1*cov[q])*(1/npix) #relative probability of any particular location
+  for(t in 2:nocc){
+      lambda[q,t] <- lambda[q,t-1]*phi[q] + lambda[q,t-1]*(gamma) #could be spatially explicit here; maybe survival varies w/ location
+  }
+}
+for(t in 1:nocc){
+Lambda[t] <- sum(lambda[,t]) ## Expected new recruits
+}
+
+psi <- Lambda[1]/M #initial alive/dead state in time t = 1
+
+
+
+for(i in 1:nind){
+    r[i,1] <- 0
+  for(t in 2:nocc){
+    r[i,t] <- equals(z[i,t],1)*equals(a[i,t], 0)*equals(a[i,t-1],1)*(t-1)
+    }
+  recruit.date[i] <- sum(r[i,]) + 1 #what time period did I enter the pop
+  }
+for(i in (nind+1):M){
+  recruit.date[i] ~ dunif(1, nocc) #this has to be provided as data - need to start augmented inds with a set recruit date 
+}
+
+for(i in 1:M){
+  sex[i] ~ dbern(p.s) #50% chance of either sex
+  z[i,1] ~ dbern(psi) #alive/real
+  s[i,1,1] ~ dunif(xmin, xmax)  #x coord; even non-real individuals get a location
+  s[i,2,1] ~ dunif(ymin, ymax) #y coord
+  pix[i,1] <- pixels[round((s[i,1,1]+ .5*pxw)/pxw),round((s[i,2,1]+ .5*pxw)/pxw)]
+  a[i,1] = 1-z[i,1] #available for recruitment 
+  age.pre[i] ~ dunif(0,age.max) 
+  age[i,1] <- age.pre[i]*z[i,1] #initial age distribution
+  pre.a[i] <- pix[i,1]
+  pre.b[i] <- recruit.date[i]
+  pre.nll[i] <- lambda[pre.a[i], pre.b[i]]
+  nll[i] <- -log(pre.nll[i]/Lambda[recruit.date[i]])
+  zeros[i] ~ dpois(nll[i]) #zeros trick
+}
+#for t > 1
+
+for(t in 2:nocc){
+  for(i in 1:M){
+    phi.p[i,t] <- phi[pix[i,t-1]]*z[i,t-1] + a[i,t-1]*gamma
+  #  z[i,t] ~ dbern(phi.p[i,t]) #This is the problem line
+    s[i,1,t] ~ dnorm(s[i,1,t-1], 1/(k[z[i,t]+1]^2)) #1/k^2 = sd of k
+    s[i,2,t] ~ dnorm(s[i,2,t-1], 1/(k[z[i,t]+1]^2))
+    pix[i,t] <- pixels[round((s[i,1,t]+ .5*pxw)/pxw), round((s[i,2,t]+ .5*pxw)/pxw)]
+    a[i,t] <- (1-z[i,t])*a[i,t-1] #available for recruitment 
+    age[i,t] <- (age[i,t-1]+1)*z[i,t] #age 0 if you're not alive or you're dead
+}
+
+Nt[t] <- sum(z[,t])
+}
+Nt[1] <- sum(z[,1])
+}
