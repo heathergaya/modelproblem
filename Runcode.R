@@ -1,7 +1,7 @@
 dget(fake.dat, "fakedat.txt")
 library(runjags)
 
-sim_test <- run.jags("Discrete_time_cont_space_ind.txt", data = fake.dat$jags.data, 
+sim_test <- run.jags("model.txt", data = fake.dat$jags.data, 
                      monitor = fake.dat$jags.pars, adapt = 100, n.chains = 2, sample = 200, burnin = 0, 
                      inits =  fake.dat$jags.inits, method = "parallel")
 
